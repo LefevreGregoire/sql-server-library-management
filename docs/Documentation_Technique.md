@@ -2,7 +2,7 @@
 
 ![SQL Server](https://img.shields.io/badge/SQL%20Server-2022-CC2927?style=for-the-badge&logo=microsoft-sql-server&logoColor=white) ![Status](https://img.shields.io/badge/Status-Completed-success?style=for-the-badge) 
 
-> **Conception et Implémentation du Système d'Information d'une librairie **  
+> **Conception et Implémentation du Système d'Information d'une librairie**  
 > Conception - Exploitation BDD (SQL Server)
 
 ---
@@ -17,6 +17,7 @@
 7. [Conclusion](#7-conclusion)
 
 ---
+
 ## 1. Contexte et Objectifs
 
 La librairie modernise son SI. L'objectif de ce projet est de concevoir une base de données relationnelle centrale capable de gérer :
@@ -36,7 +37,7 @@ La librairie modernise son SI. L'objectif de ce projet est de concevoir une base
 **Initialisation du projet :**
 Création de la base et définition du contexte d'exécution.
 
-![[CREATEBDD 1.png]]
+![Création BDD](../img/CREATEBDD.png)
 
 ---
 
@@ -47,21 +48,23 @@ Le déploiement respecte les contraintes d'intégrité référentielle en créan
 ### 3.1. Tables de Référence (Niveau 1)
 Création des entités indépendantes : `Editeur`, `Auteur`, `Rayon`.
 
-![[CREATETABLES 1.png]]
+![Tables Référence](../img/CREATETABLES.png)
+
 ### 3.2. Tables Principales (Niveau 2)
 Création des tables `Livre` et `Client`.
 > **Note technique** : Mise en place de contraintes `CHECK` (prix positif) et `UNIQUE` (email client) pour garantir la qualité des données dès l'insertion.
 
-![[TABLESPrimaires 1.png]]
+![Tables Principales](../img/TABLESPrimaires.png)
+
 ### 3.3. Tables Transactionnelles et d'Association (Niveau 3)
 Mise en place des relations Many-to-Many (`Livre_Auteur`) et des tables de flux (`Vente`, `Stock`).
 
-![[TABLESSecondaires 1.png]]
+![Tables Secondaires](../img/TABLESSecondaires.png)
 
 ### 3.4. Validation de la structure
 Vérification visuelle dans l'explorateur d'objets SSMS pour confirmer que l'ensemble du schéma `dbo` est conforme au MCD.
 
-![[FinalTABLES.png]]
+![Final Tables](../img/FinalTABLES.png)
 
 ---
 
@@ -69,7 +72,7 @@ Vérification visuelle dans l'explorateur d'objets SSMS pour confirmer que l'ens
 
 Afin de garantir les performances sur les gros volumes (80k références), des index non-clustered ont été ajoutés sur les colonnes de recherche fréquentes (`Titre`, `DateVente`, `NomClient`).
 
-![[Index 1.png]]
+![Index](../img/Index.png)
 
 ---
 
@@ -80,28 +83,33 @@ Un jeu de données complet (simulant l'année 2025) a été injecté. Voici les 
 ### 5.1. Validation des Jointures (Catalogue)
 Test de récupération d'un livre avec son auteur et son rayon.
 
-![[TestSCI-FI.png]]
+![Test Jointure](../img/TestSCI-FI.png)
+
 ### 5.2. Historique Client
 **Objectif** : Récupérer tout l'historique d'achat d'un client spécifique.
 **Requête** : Jointure `Client` -> `Vente` -> `LigneVente` -> `Livre`.
 
-![[TestHstoriqueVente.png]]
+![Historique Vente](../img/TestHstoriqueVente.png)
+
 ### 5.3. Analyse du Chiffre d'Affaires
 **Objectif** : Aggrégation des ventes par mois pour suivi comptable.
 
-![[CA.png]]
+![CA Mensuel](../img/CA.png)
+
 ### 5.4. Gestion des Événements
 **Objectif** : Planning des événements futurs (Dédicaces, Rencontres).
 
-![[HistoriqueEvent.png]]
+![Historique Event](../img/HistoriqueEvent.png)
+
 ### 5.5. Top Clients (Bonus)
 **Objectif** : Identifier les meilleurs clients (notamment les écoles/pros).
 
-![[BonusEcole.png]]
+![Bonus Ecole](../img/BonusEcole.png)
+
 ### 5.6. Alerte Stock Critique
 **Objectif** : Vue automatique remontant les livres sous le seuil d'alerte.
 
-![[TestSeuilAlerte.png]]
+![Seuil Alerte](../img/TestSeuilAlerte.png)
 
 ---
 
@@ -110,9 +118,9 @@ Test de récupération d'un livre avec son auteur et son rayon.
 ### 6.1. Vues et Procédures Stockées
 Création d'objets pour simplifier l'accès aux données (Vue Stock) et pour les exports (Procédure Export CSV).
 
-![[Vues.png]]
+![Vues](../img/Vues.png)
 
-![[TestExport.png]]
+![Test Export](../img/TestExport.png)
 
 ### 6.2. Sécurité (Rôles)
 Implémentation du principe de moindre privilège avec 3 rôles distincts :
@@ -120,12 +128,12 @@ Implémentation du principe de moindre privilège avec 3 rôles distincts :
 *   `Role_Gestion_Stock`
 *   `Role_Communication`
 
-![[Rôles.png]]
+![Rôles](../img/Rôles.png)
 
 ### 6.3. Plan de Sauvegarde
 Stratégie mise en place : Sauvegarde Complète (Hebdo) + Différentielle.
 
-![[Backups.png]]
+![Backups](../img/Backups.png)
 
 ---
 
@@ -136,4 +144,3 @@ Le projet répond à l'ensemble des exigences du cahier des charges "TOUTLA" :
 2.  **Performance** garantie par une stratégie d'indexation ciblée.
 3.  **Sécurité** gérée nativement via les rôles SQL Server.
 4.  **Exploitabilité** facilitée par des vues et procédures stockées dédiées.
-
