@@ -36,6 +36,13 @@ La librairie modernise son SI. L'objectif de ce projet est de concevoir une base
 **Initialisation du projet :**
 Création de la base et définition du contexte d'exécution.
 
+```sql
+CREATE DATABASE TOUTLA_DB;
+GO
+USE TOUTLA_DB;
+GO
+```
+
 ![Création BDD](../img/CREATEBDD.png)
 ---
 
@@ -46,16 +53,101 @@ Le déploiement respecte les contraintes d'intégrité référentielle en créan
 ### 3.1. Tables de Référence (Niveau 1)
 Création des entités indépendantes : `Editeur`, `Auteur`, `Rayon`.
 
+```sql
+-- Éditeurs
+CREATE TABLE Editeur (
+    EditeurID INT IDENTITY(1,1) PRIMARY KEY,
+    Nom NVARCHAR(100) NOT NULL,
+    Adresse NVARCHAR(255),
+    ContactEmail NVARCHAR(100)
+);
+
+-- Auteurs
+CREATE TABLE Auteur (
+    AuteurID INT IDENTITY(1,1) PRIMARY KEY,
+    Nom NVARCHAR(100) NOT NULL,
+    Prenom NVARCHAR(100),
+    Biographie NVARCHAR(MAX)
+);
+
+-- Rayons
+CREATE TABLE Rayon (
+    RayonID INT IDENTITY(1,1) PRIMARY KEY,
+    Nom NVARCHAR(50) NOT NULL,
+    Description NVARCHAR(255)
+);
+```
+
 ![Tables Référence](../img/CREATETABLES.png)
 
 ### 3.2. Tables Principales (Niveau 2)
 Création des tables `Livre` et `Client`.
 > **Note technique** : Mise en place de contraintes `CHECK` (prix positif) et `UNIQUE` (email client) pour garantir la qualité des données dès l'insertion.
 
+```sql
+-- Livres
+CREATE TABLE Livre (
+    ISBN VARCHAR(13) PRIMARY KEY,
+    Titre NVARCHAR(200) NOT NULL,
+    Resume NVARCHAR(MAX),
+    PrixHT DECIMAL(10, 2) NOT NULL,
+    DateParution DATE,
+    Langue NVARCHAR(50) DEFAULT 'Français',
+    Format NVARCHAR(50),
+    SeuilAlerte INT DEFAULT 5,
+    EditeurID INT NOT NULL,
+    RayonID_Principal INT NOT NULL,
+    CONSTRAINT FK_Livre_Editeur FOREIGN KEY (EditeurID) REFERENCES Editeur(EditeurID),
+    CONSTRAINT FK_Livre_Rayon FOREIGN KEY (RayonID_Principal) REFERENCES Rayon(RayonID),
+    CONSTRAINT CK_Prix_Positif CHECK (PrixHT >= 0)
+);
+
+-- Clients
+CREATE TABLE Client (
+    ClientID INT IDENTITY(1,1) PRIMARY KEY,
+    Nom NVARCHAR(100) NOT NULL,
+    Prenom NVARCHAR(100),
+    TypeClient CHAR(13) NOT NULL, -- 'Particulier' or 'Professionnel'
+    Email NVARCHAR(150) NOT NULL UNIQUE,
+    Telephone VARCHAR(20),
+    NumFidelite VARCHAR(20),
+    RemisePro DECIMAL(4, 2) DEFAULT 0,
+    DateCreation DATETIME DEFAULT GETDATE(),
+    Siret VARCHAR(50),
+    Adresse NVARCHAR(255),
+    CodePostal VARCHAR(10),
+    Ville NVARCHAR(100),
+    CarteFidelite BIT DEFAULT 0
+);
+```
+
 ![Tables Principales](../img/TABLESPrimaires.png)
 
 ### 3.3. Tables Transactionnelles et d'Association (Niveau 3)
 Mise en place des relations Many-to-Many (`Livre_Auteur`) et des tables de flux (`Vente`, `Stock`).
+
+```sql
+-- Liaison Livre-Auteur
+CREATE TABLE Livre_Auteur (
+    ISBN VARCHAR(13) NOT NULL,
+    AuteurID INT NOT NULL,
+    PRIMARY KEY (ISBN, AuteurID),
+    CONSTRAINT FK_LA_Livre FOREIGN KEY (ISBN) REFERENCES Livre(ISBN),
+    CONSTRAINT FK_LA_Auteur FOREIGN KEY (AuteurID) REFERENCES Auteur(AuteurID)
+);
+
+-- Stock
+CREATE TABLE Stock (
+    RayonID INT NOT NULL,
+    ISBN VARCHAR(13) NOT NULL,
+    Quantite INT NOT NULL DEFAULT 0,
+    Emplacement VARCHAR(50),
+    PRIMARY KEY (RayonID, ISBN),
+    CONSTRAINT FK_Stock_Rayon FOREIGN KEY (RayonID) REFERENCES Rayon(RayonID),
+    CONSTRAINT FK_Stock_Livre FOREIGN KEY (ISBN) REFERENCES Livre(ISBN),
+    CONSTRAINT CK_Stock_Positif CHECK (Quantite >= 0)
+);
+```
 
 ![Tables Secondaires](../img/TABLESSecondaires.png)
 
@@ -116,6 +208,50 @@ Test de récupération d'un livre avec son auteur et son rayon.
 ### 6.1. Vues et Procédures Stockées
 Création d'objets pour simplifier l'accès aux données (Vue Stock) et pour les exports (Procédure Export CSV).
 
+```sql
+-- Vue Stock Critique
+CREATE OR ALTER VIEW Vue_StockCritique AS
+SELECT L.ISBN, L.Titre, E.Nom AS Editeur, S.Quantite AS Stock_Actuel, L.SeuilAlerte
+FROM Stock S
+JOIN Livre L ON S.ISBN = L.ISBN
+JOIN Editeur E ON L.EditeurID = E.EditeurID
+WHERE S.Quantite <= L.SeuilAlerte;
+GO
+
+-- Procédure Historique Client
+CREATE OR ALTER PROCEDURE GetHistoriqueClient 
+    @ClientID INT
+AS
+BEGIN
+    SELECT 
+      C.Nom, C.Prenom, V.DateVente, L.Titre, LV.Quantite, LV.PrixUnitaire,
+      (LV.Quantite * LV.PrixUnitaire) AS Total_Ligne
+    FROM Vente V
+    JOIN Client C ON V.ClientID = C.ClientID
+    JOIN LigneVente LV ON V.VenteID = LV.VenteID
+    JOIN Livre L ON LV.ISBN = L.ISBN
+    WHERE C.ClientID = @ClientID
+    ORDER BY V.DateVente DESC;
+END;
+GO
+
+-- Procédure Export CSV
+CREATE OR ALTER PROCEDURE ExportVentesCSV AS
+BEGIN
+  SELECT FORMAT(V.DateVente, 'dd/MM/yyyy') AS [Date],
+         CAST(LV.Quantite * LV.PrixUnitaire AS DECIMAL(10,2)) AS [Montant_HT],
+         CAST((LV.Quantite * LV.PrixUnitaire) * 0.055 AS DECIMAL(10,2)) AS [TVA_5_5],
+         CAST((LV.Quantite * LV.PrixUnitaire) * 1.055 AS DECIMAL(10,2)) AS [Montant_TTC],
+         C.ClientID AS [Code_Client],
+         LV.ISBN AS [Code_Produit]
+  FROM Vente V
+  JOIN LigneVente LV ON V.VenteID = LV.VenteID
+  JOIN Client C ON V.ClientID = C.ClientID
+  ORDER BY V.DateVente ASC, C.ClientID ASC;
+END;
+GO
+```
+
 ![Vues](../img/Vues.png)
 
 ![Test Export](../img/TestExport.png)
@@ -126,10 +262,31 @@ Implémentation du principe de moindre privilège avec 3 rôles distincts :
 *   `Role_Gestion_Stock`
 *   `Role_Communication`
 
+```sql
+CREATE ROLE Role_Vente;
+CREATE ROLE Role_Gestion_Stock;
+CREATE ROLE Role_Communication;
+
+GRANT SELECT, INSERT ON Vente TO Role_Vente;
+GRANT SELECT, INSERT ON LigneVente TO Role_Vente;
+GRANT SELECT ON Client TO Role_Vente;
+GRANT EXECUTE ON GetHistoriqueClient TO Role_Vente;
+
+GRANT SELECT, UPDATE, INSERT ON Stock TO Role_Gestion_Stock;
+GRANT SELECT ON Vue_StockCritique TO Role_Gestion_Stock;
+
+GRANT SELECT, INSERT, UPDATE ON Evenement TO Role_Communication;
+```
+
 ![Rôles](../img/Rôles.png)
 
 ### 6.3. Plan de Sauvegarde
 Stratégie mise en place : Sauvegarde Complète (Hebdo) + Différentielle.
+
+```sql
+BACKUP DATABASE TOUTLA_DB TO DISK = 'C:\Backups\TOUTLA_Full.bak' WITH FORMAT;
+BACKUP DATABASE TOUTLA_DB TO DISK = 'C:\Backups\TOUTLA_Diff.bak' WITH DIFFERENTIAL;
+```
 
 ![Backups](../img/Backups.png)
 
